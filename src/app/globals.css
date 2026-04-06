@@ -1,0 +1,173 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* CalGrid Brand Colors */
+  --brand-primary: #4A7A2E;
+  --brand-primary-dark: #3D6B25;
+  --brand-primary-deep: #325A1E;
+  --brand-secondary: #B8860B;
+  --brand-secondary-light: #D4A017;
+
+  /* Editorial Palette */
+  --ink: #1A1A1A;
+  --ink-light: #333333;
+  --ink-muted: #666666;
+  --ink-faint: #999999;
+  --paper: #FAFAF7;
+  --paper-warm: #F5F0E8;
+  --paper-card: #FFFFFF;
+  --paper-hover: #F7F5F0;
+  --rule: #E0DDD5;
+  --rule-dark: #C8C4BB;
+  --rule-light: #ECEAE4;
+
+  /* Accent */
+  --accent-red: #D32F2F;
+  --accent-blue: #1565C0;
+  --accent-green: #4A7A2E;
+  --accent-gold: #B8860B;
+
+  /* Shadows */
+  --shadow-editorial: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-editorial-hover: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+@layer base {
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+    font-feature-settings: "kern" 1, "liga" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Editorial rules (dividers) */
+  hr {
+    @apply border-rule;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-rule-dark rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-ink-faint;
+  }
+}
+
+@layer components {
+  /* Editorial rule lines */
+  .rule-top {
+    @apply border-t border-rule;
+  }
+
+  .rule-bottom {
+    @apply border-b border-rule;
+  }
+
+  .rule-double {
+    border-top: 3px double var(--rule-dark);
+  }
+
+  /* Section label (overline style) */
+  .section-label {
+    @apply text-overline uppercase tracking-widest text-brand-500 font-bold;
+  }
+
+  /* Masthead styling */
+  .masthead {
+    @apply font-serif text-center py-4;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  .masthead-title {
+    @apply font-serif font-bold tracking-tight text-ink;
+  }
+
+  /* Article card hover effect */
+  .article-card {
+    @apply transition-all duration-200 ease-out;
+  }
+
+  .article-card:hover {
+    @apply shadow-editorial-hover;
+    transform: translateY(-1px);
+  }
+
+  /* Byline styling */
+  .byline {
+    @apply text-body-sm text-ink-muted font-sans;
+  }
+
+  /* Pull quote */
+  .pull-quote {
+    @apply font-serif text-headline-3 text-ink-light italic;
+    @apply border-l-4 border-brand-400 pl-4 my-6;
+  }
+
+  /* Brand button */
+  .btn-brand {
+    @apply bg-brand-500 text-white px-4 py-2 rounded-editorial;
+    @apply hover:bg-brand-600 transition-colors duration-150;
+    @apply font-sans text-body-sm font-medium;
+  }
+
+  .btn-brand-outline {
+    @apply border border-brand-400 text-brand-500 px-4 py-2 rounded-editorial;
+    @apply hover:bg-brand-50 transition-colors duration-150;
+    @apply font-sans text-body-sm font-medium;
+  }
+
+  /* Toast overrides */
+  .toast-success {
+    @apply bg-brand-50 border-brand-400 text-brand-700;
+  }
+
+  .toast-error {
+    @apply bg-red-50 border-accent-red text-red-800;
+  }
+}
+
+@layer utilities {
+  /* Text balance for headlines */
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Truncate multiline */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Fade edges for horizontal scroll */
+  .fade-edges {
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 1rem,
+      black calc(100% - 1rem),
+      transparent
+    );
+  }
+}
