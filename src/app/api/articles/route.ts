@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     const obj = Object.fromEntries(req.nextUrl.searchParams.entries());
     const q = querySchema.parse(obj);
 
-    const where: Record<string, unknown> = { status: { not: "DELETED" } };
+    const where: Record<string, unknown> = { status: "APPROVED" };
 
     /* ---- filters ---- */
     if (q.outlet) where.outletDomain = q.outlet;
@@ -93,11 +93,14 @@ export async function GET(req: NextRequest) {
       tags: parseJsonArray(r.tags),
     }));
 
+    const hasMore = q.page * q.pageSize < total;
+
     return NextResponse.json({
-      articles,
+      items: articles,
       total,
       page: q.page,
       pageSize: q.pageSize,
+      hasMore,
       totalPages: Math.ceil(total / q.pageSize),
     });
   } catch (err) {

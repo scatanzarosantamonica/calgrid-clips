@@ -74,7 +74,9 @@ export function AuditLogTable({ entries, loading, className }: AuditLogTableProp
                 className="border-b border-paper-rule hover:bg-paper-hover transition-colors"
               >
                 <td className="py-2 pr-4 text-ink-muted whitespace-nowrap tabular-nums">
-                  {formatRelativeTime(entry.createdAt)}
+                  {(entry.createdAt || entry.timestamp)
+                    ? formatRelativeTime(entry.createdAt ?? entry.timestamp!)
+                    : "—"}
                 </td>
                 <td className="py-2 pr-4">
                   <span
@@ -87,15 +89,15 @@ export function AuditLogTable({ entries, loading, className }: AuditLogTableProp
                   </span>
                 </td>
                 <td className="py-2 pr-4 text-ink-lead">
-                  {entry.entity}
-                  {entry.entityId && (
+                  {entry.entity ?? "article"}
+                  {(entry.entityId || entry.articleId) && (
                     <span className="text-ink-muted ml-1">
-                      #{entry.entityId.slice(0, 8)}
+                      #{(entry.entityId ?? entry.articleId ?? "").slice(0, 8)}
                     </span>
                   )}
                 </td>
                 <td className="py-2 pr-4 text-ink-meta">
-                  {entry.userName || entry.userId || "system"}
+                  {entry.userName || entry.actorEmail || entry.userId || "system"}
                 </td>
                 <td className="py-2 text-ink-muted max-w-[240px] truncate">
                   {entry.details ?? "\u2014"}

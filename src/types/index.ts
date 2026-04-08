@@ -38,12 +38,15 @@ export interface DashboardFilters {
 export interface AuditLogEntry {
   id: string;
   action: string;
-  entity: string;
-  entityId: string | null;
-  userId: string | null;
-  userName: string | null;
+  entity?: string;
+  entityId?: string | null;
+  articleId?: string | null;
+  actorEmail?: string | null;
+  userId?: string | null;
+  userName?: string | null;
   details: string | null;
-  createdAt: string;
+  createdAt?: string;
+  timestamp?: string;
 }
 
 export interface ArticleFormData {

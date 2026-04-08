@@ -3,9 +3,9 @@
 import { useState, useEffect, type ReactNode } from "react";
 import Image from "next/image";
 
-// SHA-256 hash of "Gaming123!"
+// SHA-256 hash of "Calgrid123!"
 const VALID_HASH =
-  "2bc87f0f815b0b34a70b7d97941a9d3516f83a46d1666611fab0ecbf41070c92";
+  "cad6e180bdcebbf8e4a23a9539c92c97d12e111be3a7f054331bd7d9e8abe70e";
 
 interface AuthGateProps {
   children: ReactNode;
@@ -68,9 +68,9 @@ export default function AuthGate({ children }: AuthGateProps) {
             <Image
               src="/logo.png"
               alt="CalGrid Logo"
-              width={72}
-              height={72}
-              className="object-contain"
+              width={200}
+              height={60}
+              className="h-16 w-auto object-contain mix-blend-multiply"
               onError={(e) => {
                 (e.currentTarget as HTMLImageElement).style.display = "none";
               }}

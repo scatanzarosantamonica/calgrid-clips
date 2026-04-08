@@ -25,6 +25,7 @@ export async function GET(req: NextRequest) {
     ]);
 
     return NextResponse.json({
+      items: rows,
       logs: rows,
       total,
       page,

@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import {
   CheckCircle, XCircle, PenSquare, ExternalLink, Clock,
-  AlertCircle, Star, Link2, Trash2,
+  AlertCircle, Star, Link2, Trash2, Check,
 } from "lucide-react";
 import { OutletIcon } from "@/components/shared/OutletIcon";
 import { KeywordChipList } from "@/components/shared/KeywordChip";
@@ -22,19 +22,24 @@ import type { Article } from "@/types";
 /* ---------- status helpers ---------- */
 
 const STATUS_MAP: Record<string, { label: string; icon: React.ElementType; cls: string }> = {
-  pending:  { label: "Pending",  icon: Clock,       cls: "text-amber-600 bg-amber-50 border-amber-200" },
-  approved: { label: "Approved", icon: CheckCircle,  cls: "text-emerald-700 bg-emerald-50 border-emerald-200" },
-  rejected: { label: "Rejected", icon: XCircle,      cls: "text-red-600 bg-red-50 border-red-200" },
+  QUEUED:       { label: "Pending",      icon: Clock,       cls: "text-amber-600 bg-amber-50 border-amber-200" },
+  NEEDS_MANUAL: { label: "Needs Manual", icon: AlertCircle, cls: "text-orange-600 bg-orange-50 border-orange-200" },
+  APPROVED:     { label: "Approved",     icon: CheckCircle, cls: "text-emerald-700 bg-emerald-50 border-emerald-200" },
+  REJECTED:     { label: "Rejected",     icon: XCircle,     cls: "text-red-600 bg-red-50 border-red-200" },
 };
 
 /* ---------- component ---------- */
 
 interface QueueItemProps {
   article:   Article;
-  onAction:  () => void;          // refresh list after any action
+  onAction:  (id: string, action: "APPROVED" | "REJECTED" | "NEEDS_MANUAL") => void;
+  onUpdated: (article: Article) => void;
+  onDelete:  (id: string) => void;
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }
 
-export function QueueItem({ article, onAction }: QueueItemProps) {
+export function QueueItem({ article, onAction, onUpdated, onDelete, selected, onToggleSelect }: QueueItemProps) {
   const [busy, setBusy]               = useState(false);
   const [editOpen, setEditOpen]       = useState(false);
   const [deleteOpen, setDeleteOpen]   = useState(false);
@@ -45,15 +50,37 @@ export function QueueItem({ article, onAction }: QueueItemProps) {
 
   /* --- actions --- */
 
-  async function act(action: "approve" | "reject" | "delete") {
+  async function handleApprove() {
     setBusy(true);
     try {
-      const res = await fetch(`/api/articles/${article.id}/${action}`, { method: "POST" });
-      if (!res.ok) throw new Error(await res.text());
-      toast({ title: `Article ${action}d` });
-      onAction();
+      await onAction(article.id, "APPROVED");
+      toast({ title: "Article approved" });
     } catch (err) {
-      toast({ title: `Failed to ${action}`, description: String(err), variant: "error" });
+      toast({ title: "Failed to approve", description: String(err), variant: "error" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleReject() {
+    setBusy(true);
+    try {
+      await onAction(article.id, "REJECTED");
+      toast({ title: "Article rejected" });
+    } catch (err) {
+      toast({ title: "Failed to reject", description: String(err), variant: "error" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDelete() {
+    setBusy(true);
+    try {
+      await onDelete(article.id);
+      toast({ title: "Article deleted" });
+    } catch (err) {
+      toast({ title: "Failed to delete", description: String(err), variant: "error" });
     } finally {
       setBusy(false);
     }
@@ -64,9 +91,24 @@ export function QueueItem({ article, onAction }: QueueItemProps) {
       <div className={cn(
         "nyt-card group",
         article.priority && "ring-1 ring-amber-300 bg-amber-50/30",
+        selected && "ring-2 ring-brand-400/50 bg-brand-50/20",
       )}>
-        {/* top row: status + outlet + time */}
+        {/* top row: checkbox + status + outlet + time */}
         <div className="flex items-center gap-2 mb-2 flex-wrap">
+          {onToggleSelect && (
+            <button
+              type="button"
+              onClick={() => onToggleSelect(article.id)}
+              className={cn(
+                "h-4 w-4 rounded border-2 shrink-0 flex items-center justify-center transition-colors mr-0.5",
+                selected
+                  ? "bg-brand-500 border-brand-500"
+                  : "border-ink-meta hover:border-ink-lead",
+              )}
+            >
+              {selected && <Check className="h-2.5 w-2.5 text-white" />}
+            </button>
+          )}
           <span className={cn(
             "inline-flex items-center gap-1 text-[10px] font-sans font-bold uppercase tracking-widest border px-1.5 py-0.5 rounded-sm",
             status.cls,
@@ -131,11 +173,11 @@ export function QueueItem({ article, onAction }: QueueItemProps) {
 
         {/* action buttons */}
         <div className="flex items-center gap-2 flex-wrap border-t border-paper-rule pt-3">
-          {article.status === "pending" && (
+          {(article.status === "QUEUED" || article.status === "NEEDS_MANUAL") && (
             <>
               <Button
                 size="sm"
-                onClick={() => act("approve")}
+                onClick={handleApprove}
                 disabled={busy}
                 className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] uppercase tracking-widest font-sans"
               >
@@ -145,7 +187,7 @@ export function QueueItem({ article, onAction }: QueueItemProps) {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => act("reject")}
+                onClick={handleReject}
                 disabled={busy}
                 className="gap-1.5 text-[11px] uppercase tracking-widest font-sans border-red-300 text-red-600 hover:bg-red-50"
               >
@@ -184,7 +226,7 @@ export function QueueItem({ article, onAction }: QueueItemProps) {
         article={editOpen ? article : null}
         open={editOpen}
         onOpenChange={setEditOpen}
-        onSaved={onAction}
+        onSaved={(updated: Article) => { onUpdated(updated); setEditOpen(false); }}
       />
 
       {/* delete confirm */}
@@ -205,7 +247,7 @@ export function QueueItem({ article, onAction }: QueueItemProps) {
             </Button>
             <Button
               variant="destructive"
-              onClick={() => { setDeleteOpen(false); act("delete"); }}
+              onClick={() => { setDeleteOpen(false); handleDelete(); }}
             >
               Delete
             </Button>

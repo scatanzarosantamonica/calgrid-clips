@@ -6,6 +6,36 @@ import { sanitizeText } from "@/lib/sanitize";
 import { fetchUrlMetadata } from "@/lib/url-metadata";
 import { parseJsonArray } from "@/lib/utils";
 
+/* ────────────────────────────── GET ────────────────────────────── */
+
+export async function GET(req: NextRequest) {
+  try {
+    const status = req.nextUrl.searchParams.get("status") ?? "QUEUED";
+
+    const where: Record<string, unknown> =
+      status === "all" ? {} : { status };
+
+    const rows = await prisma.article.findMany({
+      where,
+      orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
+      take: 200,
+    });
+
+    const articles = rows.map((r) => ({
+      ...r,
+      keywordsMatched: parseJsonArray(r.keywordsMatched),
+      tags: parseJsonArray(r.tags),
+    }));
+
+    return NextResponse.json(articles);
+  } catch (err) {
+    console.error("[GET /api/queue]", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+/* ────────────────────────────── POST ───────────────────────────── */
+
 const queueSchema = z.object({
   url:       z.string().url(),
   title:     z.string().optional(),

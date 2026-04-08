@@ -12,6 +12,9 @@ import {
   GripVertical,
   Search,
   X,
+  Calendar,
+  CheckSquare,
+  Square,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -36,6 +39,17 @@ const SECTION_PRESETS = [
   "California Politics",
 ];
 
+// ─── Date range options ─────────────────────────────────────────────────────
+
+type DateRange = 7 | 14 | 30 | "all";
+
+const DATE_RANGE_OPTIONS: { label: string; value: DateRange }[] = [
+  { label: "Last 7 days", value: 7 },
+  { label: "Last 14 days", value: 14 },
+  { label: "Last 30 days", value: 30 },
+  { label: "All", value: "all" },
+];
+
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function ClipsPage() {
@@ -43,6 +57,7 @@ export default function ClipsPage() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [dateRange, setDateRange] = useState<DateRange>(14);
 
   // Clip composition state
   const [sections, setSections] = useState<ComposerSection[]>([
@@ -80,17 +95,62 @@ export default function ClipsPage() {
     [sections]
   );
 
-  // ── Filtered articles for the picker ───────────────────────────────────────
+  // ── Date-filtered articles ─────────────────────────────────────────────────
+  const dateFilteredArticles = useMemo(() => {
+    if (dateRange === "all") return articles;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - dateRange);
+    cutoff.setHours(0, 0, 0, 0);
+    return articles.filter((a) => {
+      const pubDate = new Date(a.publishedAt);
+      return pubDate >= cutoff;
+    });
+  }, [articles, dateRange]);
+
+  // ── Filtered articles for the picker (date + search) ───────────────────────
   const filteredArticles = useMemo(() => {
-    if (!search.trim()) return articles;
+    if (!search.trim()) return dateFilteredArticles;
     const q = search.toLowerCase();
-    return articles.filter(
+    return dateFilteredArticles.filter(
       (a) =>
         a.title.toLowerCase().includes(q) ||
         a.outlet.toLowerCase().includes(q) ||
         (a.author ?? "").toLowerCase().includes(q)
     );
-  }, [articles, search]);
+  }, [dateFilteredArticles, search]);
+
+  // ── Select All / Deselect All logic ────────────────────────────────────────
+  const currentSectionIds = sections[activeSection]?.articleIds ?? [];
+  const allVisibleInCurrentSection = useMemo(() => {
+    if (filteredArticles.length === 0) return false;
+    return filteredArticles.every((a) => currentSectionIds.includes(a.id));
+  }, [filteredArticles, currentSectionIds]);
+
+  function handleSelectAllToggle() {
+    const visibleIds = filteredArticles.map((a) => a.id);
+    if (allVisibleInCurrentSection) {
+      // Deselect all visible from current section
+      setSections((prev) =>
+        prev.map((s, i) => {
+          if (i !== activeSection) return s;
+          return {
+            ...s,
+            articleIds: s.articleIds.filter((id) => !visibleIds.includes(id)),
+          };
+        })
+      );
+    } else {
+      // Select all visible into current section (add those not already present)
+      setSections((prev) =>
+        prev.map((s, i) => {
+          if (i !== activeSection) return s;
+          const existing = new Set(s.articleIds);
+          const toAdd = visibleIds.filter((id) => !existing.has(id));
+          return { ...s, articleIds: [...s.articleIds, ...toAdd] };
+        })
+      );
+    }
+  }
 
   // ── Helpers: resolve snippet for an article ────────────────────────────────
   function getSnippet(article: Article): string {
@@ -282,6 +342,25 @@ export default function ClipsPage() {
             </span>
           </div>
 
+          {/* Date range filter */}
+          <div className="flex items-center gap-1.5">
+            <Calendar className="h-3.5 w-3.5 text-[--text-muted] shrink-0" />
+            {DATE_RANGE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setDateRange(opt.value)}
+                className={cn(
+                  "px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all",
+                  dateRange === opt.value
+                    ? "bg-brand-500/15 border-brand-500/30 text-brand-400"
+                    : "bg-surface border-surface-border text-[--text-muted] hover:text-[--text-secondary] hover:bg-surface-raised"
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
           {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[--text-muted]" />
@@ -302,8 +381,26 @@ export default function ClipsPage() {
             )}
           </div>
 
+          {/* Select All / Deselect All toggle */}
+          {!loading && filteredArticles.length > 0 && (
+            <button
+              onClick={handleSelectAllToggle}
+              className="flex items-center gap-1.5 text-xs font-medium text-[--text-muted] hover:text-[--text-secondary] transition-colors"
+            >
+              {allVisibleInCurrentSection ? (
+                <CheckSquare className="h-3.5 w-3.5 text-brand-400" />
+              ) : (
+                <Square className="h-3.5 w-3.5" />
+              )}
+              {allVisibleInCurrentSection ? "Deselect All" : "Select All"}
+              <span className="text-[--text-muted]">
+                ({filteredArticles.length})
+              </span>
+            </button>
+          )}
+
           {/* Article list */}
-          <div className="space-y-1.5 max-h-[calc(100vh-280px)] overflow-y-auto pr-1">
+          <div className="space-y-1.5 max-h-[calc(100vh-340px)] overflow-y-auto pr-1">
             {loading ? (
               <p className="text-sm text-[--text-muted] py-8 text-center">
                 Loading articles...

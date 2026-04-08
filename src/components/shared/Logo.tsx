@@ -13,9 +13,9 @@ interface LogoProps {
 }
 
 const SIZE_MAP = {
-  sm: { px: 28, text: "text-sm"  },
-  md: { px: 48, text: "text-lg"  },
-  lg: { px: 72, text: "text-2xl" },
+  sm: { px: 36, text: "text-sm"  },
+  md: { px: 64, text: "text-lg"  },
+  lg: { px: 96, text: "text-2xl" },
 } as const;
 
 export function Logo({ size = "md", showText = false, className }: LogoProps) {
@@ -33,7 +33,7 @@ export function Logo({ size = "md", showText = false, className }: LogoProps) {
       />
       {showText && (
         <span className={cn("font-serif font-black text-ink tracking-tight leading-none select-none", text)}>
-          CALGRID
+          CALGRID NEWS
         </span>
       )}
     </span>

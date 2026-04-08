@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { PlusCircle, X, ExternalLink, AlertCircle, ImageIcon } from "lucide-react";
+import { PlusCircle, X, ExternalLink, AlertCircle, ImageIcon, Save, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -36,23 +36,103 @@ const DEFAULT_FORM: FormState = {
   status:        "QUEUED",
 };
 
+// Known outlet domain → name mappings
+const OUTLET_MAP: Record<string, string> = {
+  "latimes.com": "Los Angeles Times",
+  "sfchronicle.com": "San Francisco Chronicle",
+  "sacbee.com": "Sacramento Bee",
+  "sandiegouniontribune.com": "San Diego Union-Tribune",
+  "mercurynews.com": "Mercury News",
+  "pe.com": "Press-Enterprise",
+  "desertsun.com": "Desert Sun",
+  "calmatters.org": "CalMatters",
+  "politico.com": "Politico",
+  "eenews.net": "E&E News",
+  "utilitydive.com": "Utility Dive",
+  "greentechmedia.com": "Greentech Media",
+  "spglobal.com": "S&P Global",
+  "reuters.com": "Reuters",
+  "apnews.com": "Associated Press",
+  "bloomberg.com": "Bloomberg",
+  "nytimes.com": "New York Times",
+  "washingtonpost.com": "Washington Post",
+};
+
 export default function ManualEntryPage() {
   const [form,     setForm]     = useState<FormState>(DEFAULT_FORM);
   const [tagInput, setTagInput] = useState("");
   const [saving,   setSaving]   = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [fetching, setFetching] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
-  // Auto-extract domain from URL
+  // Auto-extract domain and outlet name from URL
+  function handleUrlBlur() {
+    const url = form.url.trim();
+    if (!url) return;
+    try {
+      const domain = new URL(url).hostname.replace(/^www\./, "");
+      if (!form.outletDomain) update("outletDomain", domain);
+      if (!form.outlet) {
+        const match = OUTLET_MAP[domain];
+        if (match) update("outlet", match);
+      }
+    } catch { /* not a valid URL yet */ }
+  }
+
   function handleUrlChange(url: string) {
     update("url", url);
     try {
       const domain = new URL(url).hostname.replace(/^www\./, "");
       if (!form.outletDomain) update("outletDomain", domain);
+      // Also try to auto-fill outlet name
+      if (!form.outlet) {
+        const match = OUTLET_MAP[domain];
+        if (match) update("outlet", match);
+      }
     } catch { /* not a valid URL yet */ }
+  }
+
+  // Auto-populate from URL metadata
+  async function handleAutoPopulate() {
+    const url = form.url.trim();
+    if (!url) return;
+    setFetching(true);
+    try {
+      const res = await fetch("/api/admin/articles/fetch-from-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      if (res.status === 409) {
+        const data = await res.json();
+        toast({ variant: "warning", title: "URL already exists", description: data.error });
+        return;
+      }
+      if (!res.ok) {
+        toast({ variant: "error", title: "Could not fetch metadata" });
+        return;
+      }
+      const article = await res.json();
+      // Pre-fill form from fetched article
+      setForm((f) => ({
+        ...f,
+        title: article.title || f.title,
+        outlet: article.outlet || f.outlet,
+        outletDomain: article.outletDomain || f.outletDomain,
+        snippet: article.snippet || f.snippet,
+        imageUrl: article.imageUrl || f.imageUrl,
+      }));
+      toast({ variant: "success", title: "Metadata fetched", description: "Form populated from URL." });
+    } catch {
+      toast({ variant: "error", title: "Network error" });
+    } finally {
+      setFetching(false);
+    }
   }
 
   function addTag() {
@@ -67,18 +147,25 @@ export default function ManualEntryPage() {
     update("tags", form.tags.filter((t) => t !== tag));
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent, asDraft = false) {
     e.preventDefault();
-    setSaving(true);
+    if (asDraft) {
+      setSavingDraft(true);
+    } else {
+      setSaving(true);
+    }
     try {
+      const submitData = {
+        ...form,
+        imageUrl: form.imageUrl.trim() || undefined,
+        publishedAt: form.publishedAt + ":00Z",
+        status: asDraft ? "NEEDS_MANUAL" : form.status,
+      };
+
       const res = await fetch("/api/queue", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({
-          ...form,
-          imageUrl:    form.imageUrl.trim() || undefined,
-          publishedAt: form.publishedAt + ":00Z",
-        }),
+        body:    JSON.stringify(submitData),
       });
 
       if (!res.ok) {
@@ -91,20 +178,23 @@ export default function ManualEntryPage() {
       setForm(DEFAULT_FORM);
       setTagInput("");
       toast({
-        variant:     "success",
-        title:       "Article added",
-        description: `"${created.title.slice(0, 60)}" added to queue`,
+        variant: "success",
+        title: asDraft ? "Draft saved" : "Article added",
+        description: `"${created.title.slice(0, 60)}" ${asDraft ? "saved as draft" : "added to queue"}`,
       });
     } catch (err) {
       toast({
-        variant:     "error",
-        title:       "Failed to save",
+        variant: "error",
+        title: "Failed to save",
         description: err instanceof Error ? err.message : "Unknown error",
       });
     } finally {
       setSaving(false);
+      setSavingDraft(false);
     }
   }
+
+  const isBusy = saving || savingDraft || fetching;
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
@@ -130,21 +220,44 @@ export default function ManualEntryPage() {
 
       {lastSaved && (
         <div className="bg-emerald-950/50 border border-emerald-800/50 rounded-xl px-4 py-3 text-emerald-300 text-sm">
-          ✓ Saved: &ldquo;{lastSaved}&rdquo;
+          Saved: &ldquo;{lastSaved}&rdquo;
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-5 bg-surface rounded-xl border border-surface-border p-6">
+      <form onSubmit={(e) => handleSubmit(e, false)} className="space-y-5 bg-surface rounded-xl border border-surface-border p-6">
         {/* URL — first because it auto-fills domain */}
         <Field label="Article URL *">
-          <Input
-            type="url"
-            value={form.url}
-            onChange={(e) => handleUrlChange(e.target.value)}
-            placeholder="https://example.com/article"
-            required
-            leftIcon={<ExternalLink className="h-3.5 w-3.5" />}
-          />
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <Input
+                type="url"
+                value={form.url}
+                onChange={(e) => handleUrlChange(e.target.value)}
+                onBlur={handleUrlBlur}
+                placeholder="https://example.com/article"
+                required
+                leftIcon={<ExternalLink className="h-3.5 w-3.5" />}
+              />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleAutoPopulate}
+              disabled={!form.url.trim() || isBusy}
+              className="shrink-0 gap-1.5 h-10"
+            >
+              {fetching ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <ExternalLink className="h-3.5 w-3.5" />
+              )}
+              {fetching ? "Fetching..." : "Auto-fill"}
+            </Button>
+          </div>
+          <p className="text-xs text-[--text-muted] mt-1">
+            Paste a URL and click &ldquo;Auto-fill&rdquo; to populate fields from the article&apos;s metadata.
+          </p>
         </Field>
 
         {/* Title */}
@@ -185,7 +298,6 @@ export default function ManualEntryPage() {
             value={form.publishedAt}
             onChange={(e) => update("publishedAt", e.target.value)}
             required
-            className="[color-scheme:dark]"
           />
         </Field>
 
@@ -288,21 +400,35 @@ export default function ManualEntryPage() {
           </Field>
         </div>
 
-        {/* Submit */}
+        {/* Submit buttons */}
         <div className="flex gap-3 pt-2">
-          <Button type="submit" disabled={saving} className="flex-1">
+          <Button type="submit" disabled={isBusy} className="flex-1">
             {saving ? (
               <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
             ) : (
               <PlusCircle className="h-4 w-4" />
             )}
-            {saving ? "Saving…" : "Add Article"}
+            {saving ? "Saving..." : "Add Article"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={(e) => handleSubmit(e as unknown as React.FormEvent, true)}
+            disabled={isBusy || !form.url.trim() || !form.title.trim()}
+            className="gap-1.5"
+          >
+            {savingDraft ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            {savingDraft ? "Saving..." : "Save Draft"}
           </Button>
           <Button
             type="button"
             variant="secondary"
             onClick={() => setForm(DEFAULT_FORM)}
-            disabled={saving}
+            disabled={isBusy}
           >
             Reset
           </Button>

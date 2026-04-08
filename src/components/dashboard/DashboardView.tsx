@@ -142,9 +142,9 @@ export function DashboardView({ section = null }: DashboardViewProps) {
               <Image
                 src="/logo.png"
                 alt="CalGrid Logo"
-                width={200}
-                height={60}
-                className="h-12 sm:h-16 w-auto object-contain mb-3"
+                width={320}
+                height={96}
+                className="h-16 sm:h-24 w-auto object-contain mb-3"
                 priority
               />
               <h1

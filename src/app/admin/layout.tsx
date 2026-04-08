@@ -17,7 +17,7 @@ export default async function AdminLayout({
   if (!session) redirect("/login");
 
   return (
-    <div className="flex min-h-screen bg-bg-base">
+    <div className="min-h-screen bg-white">
       <AdminNav />
       <main className="flex-1 overflow-auto">
         {children}
