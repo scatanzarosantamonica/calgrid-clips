@@ -1,12 +1,7 @@
 import { PrismaClient } from "@prisma/client";
-import { PrismaLibSQL } from "@prisma/adapter-libsql";
-import { createClient } from "@libsql/client";
 import bcrypt from "bcryptjs";
 
-const url = process.env.TURSO_DATABASE_URL || "file:./dev.db";
-const libsql = createClient({ url, authToken: process.env.TURSO_AUTH_TOKEN });
-const adapter = new PrismaLibSQL(libsql);
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient();
 
 async function main() {
   // Seed admin user
