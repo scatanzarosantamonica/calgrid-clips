@@ -36,35 +36,35 @@ export function EditArticleModal({
 }: EditArticleModalProps) {
   const [form, setForm] = useState({
     title: "",
-    description: "",
-    source: "",
-    author: "",
+    snippet: "",
+    url: "",
     imageUrl: "",
     section: "transmission" as ArticleSection,
-    keywords: "",
+    priority: false,
+    tags: "",
   });
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     if (article) {
-      const kws = Array.isArray(article.keywords)
-        ? article.keywords
+      const tagsList = Array.isArray(article.tags)
+        ? article.tags
         : (() => {
             try {
-              return JSON.parse(article.keywords as unknown as string);
+              return JSON.parse(article.tags as unknown as string);
             } catch {
               return [];
             }
           })();
       setForm({
         title: article.title || "",
-        description: article.description || "",
-        source: article.source || "",
-        author: article.author || "",
+        snippet: article.snippet || "",
+        url: article.url || "",
         imageUrl: article.imageUrl || "",
-        section: article.section,
-        keywords: kws.join(", "),
+        section: (article.section as ArticleSection) || "transmission",
+        priority: article.priority || false,
+        tags: tagsList.join(", "),
       });
     }
   }, [article]);
@@ -74,23 +74,28 @@ export function EditArticleModal({
     setSaving(true);
 
     try {
-      const keywords = form.keywords
+      const tags = form.tags
         .split(",")
         .map((k) => k.trim())
         .filter(Boolean);
 
+      const payload: Record<string, unknown> = {
+        title: form.title,
+        snippet: form.snippet || null,
+        imageUrl: form.imageUrl || null,
+        section: form.section,
+        priority: form.priority,
+        tags,
+      };
+
+      if (form.url && form.url !== article.url) {
+        payload.url = form.url;
+      }
+
       const res = await fetch(`/api/articles/${article.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: form.title,
-          description: form.description || null,
-          source: form.source || null,
-          author: form.author || null,
-          imageUrl: form.imageUrl || null,
-          section: form.section,
-          keywords,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) throw new Error("Failed to update article");
@@ -132,36 +137,26 @@ export function EditArticleModal({
 
           <div>
             <label className="block text-body-sm font-medium text-ink-light mb-1">
-              Description
+              Snippet
             </label>
             <textarea
-              value={form.description}
+              value={form.snippet}
               onChange={(e) =>
-                setForm({ ...form, description: e.target.value })
+                setForm({ ...form, snippet: e.target.value })
               }
               className="w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 focus:ring-offset-2 min-h-[80px]"
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-body-sm font-medium text-ink-light mb-1">
-                Source
-              </label>
-              <Input
-                value={form.source}
-                onChange={(e) => setForm({ ...form, source: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block text-body-sm font-medium text-ink-light mb-1">
-                Author
-              </label>
-              <Input
-                value={form.author}
-                onChange={(e) => setForm({ ...form, author: e.target.value })}
-              />
-            </div>
+          <div>
+            <label className="block text-body-sm font-medium text-ink-light mb-1">
+              Article URL
+            </label>
+            <Input
+              value={form.url}
+              onChange={(e) => setForm({ ...form, url: e.target.value })}
+              placeholder="https://..."
+            />
           </div>
 
           <div>
@@ -171,38 +166,52 @@ export function EditArticleModal({
             <Input
               value={form.imageUrl}
               onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
+              placeholder="https://..."
             />
           </div>
 
-          <div>
-            <label className="block text-body-sm font-medium text-ink-light mb-1">
-              Section
-            </label>
-            <select
-              value={form.section}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  section: e.target.value as ArticleSection,
-                })
-              }
-              className="w-full h-10 rounded-md border border-rule bg-paper px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 focus:ring-offset-2"
-            >
-              {SECTION_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-body-sm font-medium text-ink-light mb-1">
+                Section
+              </label>
+              <select
+                value={form.section}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    section: e.target.value as ArticleSection,
+                  })
+                }
+                className="w-full h-10 rounded-md border border-rule bg-paper px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 focus:ring-offset-2"
+              >
+                {SECTION_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-end pb-2">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.priority}
+                  onChange={(e) => setForm({ ...form, priority: e.target.checked })}
+                  className="h-4 w-4 rounded border-rule"
+                />
+                Priority article
+              </label>
+            </div>
           </div>
 
           <div>
             <label className="block text-body-sm font-medium text-ink-light mb-1">
-              Keywords (comma-separated)
+              Tags (comma-separated)
             </label>
             <Input
-              value={form.keywords}
-              onChange={(e) => setForm({ ...form, keywords: e.target.value })}
+              value={form.tags}
+              onChange={(e) => setForm({ ...form, tags: e.target.value })}
               placeholder="energy, transmission, California"
             />
           </div>

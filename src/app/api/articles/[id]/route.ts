@@ -13,6 +13,7 @@ const patchSchema = z.object({
   tags:          z.array(z.string()).optional(),
   section:       z.enum(["transmission", "energy", "labor", "local"]).nullable().optional(),
   imageUrl:      z.string().url().nullable().optional(),
+  url:           z.string().url().optional(),
   status:        z.string().optional(),
 });
 
@@ -62,6 +63,7 @@ export async function PATCH(
     if (data.tags !== undefined) update.tags = JSON.stringify(data.tags);
     if (data.section !== undefined) update.section = data.section;
     if (data.imageUrl !== undefined) update.imageUrl = data.imageUrl;
+    if (data.url !== undefined) update.url = data.url;
     if (data.status !== undefined) update.status = data.status;
 
     const article = await prisma.article.update({ where: { id }, data: update });

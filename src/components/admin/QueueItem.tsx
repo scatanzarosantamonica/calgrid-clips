@@ -226,7 +226,7 @@ export function QueueItem({ article, onAction, onUpdated, onDelete, selected, on
         article={editOpen ? article : null}
         open={editOpen}
         onOpenChange={setEditOpen}
-        onSaved={(updated: Article) => { onUpdated(updated); setEditOpen(false); }}
+        onSaved={() => { setEditOpen(false); }}
       />
 
       {/* delete confirm */}
