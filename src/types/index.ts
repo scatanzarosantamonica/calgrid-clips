@@ -1,29 +1,31 @@
 export type ArticleSection = "transmission" | "energy" | "labor" | "local";
 
-export type ArticleStatus = "pending" | "approved" | "rejected";
+export type ArticleStatus = "QUEUED" | "NEEDS_MANUAL" | "APPROVED" | "REJECTED" | "DELETED";
 
 export interface Article {
   id: string;
   url: string;
   title: string;
-  description: string | null;
-  source: string | null;
+  description?: string | null;
+  source?: string | null;
   outlet: string;
+  outletDomain?: string;
   author: string | null;
   imageUrl: string | null;
-  section: ArticleSection;
-  keywords: string[];
-  keywordsMatched: string[];
-  tags: string[];
+  section: ArticleSection | string | null;
+  keywords?: string[];
+  keywordsMatched: string[] | string;
+  tags: string[] | string;
   snippet: string | null;
   manualSummary: string | null;
   priority: boolean;
-  status: ArticleStatus;
+  status: ArticleStatus | string;
+  ingestSource?: string;
   publishedAt: string;
   createdAt: string;
   updatedAt: string;
-  approvedBy: string | null;
-  rejectedBy: string | null;
+  approvedBy?: string | null;
+  rejectedBy?: string | null;
 }
 
 export interface DashboardFilters {
