@@ -61,7 +61,7 @@ export default function AuditPage() {
     return entries.filter((entry) => {
       // The API includes article: { title, outlet } on each row
       const articleTitle =
-        (entry as Record<string, unknown> & { article?: { title?: string } })
+        ((entry as unknown) as { article?: { title?: string } })
           .article?.title ?? "";
       const details = entry.details ?? "";
       return (
