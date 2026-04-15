@@ -39,6 +39,7 @@ export function EditArticleModal({
     snippet: "",
     url: "",
     imageUrl: "",
+    publishedAt: "",
     section: "transmission" as ArticleSection,
     priority: false,
     tags: "",
@@ -62,6 +63,7 @@ export function EditArticleModal({
         snippet: article.snippet || "",
         url: article.url || "",
         imageUrl: article.imageUrl || "",
+        publishedAt: article.publishedAt ? toLocalDatetimeString(new Date(article.publishedAt)) : "",
         section: (article.section as ArticleSection) || "transmission",
         priority: article.priority || false,
         tags: tagsList.join(", "),
@@ -90,6 +92,11 @@ export function EditArticleModal({
 
       if (form.url && form.url !== article.url) {
         payload.url = form.url;
+      }
+
+      if (form.publishedAt) {
+        const d = new Date(form.publishedAt);
+        if (!isNaN(d.getTime())) payload.publishedAt = d.toISOString();
       }
 
       const res = await fetch(`/api/articles/${article.id}`, {
@@ -170,6 +177,17 @@ export function EditArticleModal({
             />
           </div>
 
+          <div>
+            <label className="block text-body-sm font-medium text-ink-light mb-1">
+              Published Date/Time
+            </label>
+            <Input
+              type="datetime-local"
+              value={form.publishedAt}
+              onChange={(e) => setForm({ ...form, publishedAt: e.target.value })}
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-body-sm font-medium text-ink-light mb-1">
@@ -235,4 +253,9 @@ export function EditArticleModal({
       </DialogContent>
     </Dialog>
   );
+}
+
+function toLocalDatetimeString(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }

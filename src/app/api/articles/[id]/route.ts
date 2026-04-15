@@ -15,6 +15,7 @@ const patchSchema = z.object({
   imageUrl:      z.string().url().nullable().optional(),
   url:           z.string().url().optional(),
   status:        z.string().optional(),
+  publishedAt:   z.string().optional(),
 });
 
 export async function GET(
@@ -65,6 +66,10 @@ export async function PATCH(
     if (data.imageUrl !== undefined) update.imageUrl = data.imageUrl;
     if (data.url !== undefined) update.url = data.url;
     if (data.status !== undefined) update.status = data.status;
+    if (data.publishedAt !== undefined) {
+      const d = new Date(data.publishedAt);
+      if (!isNaN(d.getTime())) update.publishedAt = d;
+    }
 
     const article = await prisma.article.update({ where: { id }, data: update });
 
