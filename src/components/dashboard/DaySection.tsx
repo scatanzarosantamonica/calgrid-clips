@@ -42,11 +42,15 @@ export function DaySection({ dateKey, articles }: DaySectionProps) {
 
       <div>
         {articles.map((article, i) => (
-          <ArticleCard
+          <div
             key={article.id}
-            article={article}
-            style={{ animationDelay: `${i * 40}ms` } as React.CSSProperties}
-          />
+            className={i === 0 ? "pt-5" : "border-t border-rule pt-5 mt-5"}
+          >
+            <ArticleCard
+              article={article}
+              style={{ animationDelay: `${i * 40}ms` } as React.CSSProperties}
+            />
+          </div>
         ))}
       </div>
     </section>

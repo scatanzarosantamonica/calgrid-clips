@@ -43,9 +43,9 @@ export async function POST(req: NextRequest) {
 
     const url = normalizeUrl(data.url);
 
-    /* duplicate check */
+    /* duplicate check — soft-deleted records should not block re-adding the URL */
     const existing = await prisma.article.findUnique({ where: { url } });
-    if (existing) {
+    if (existing && existing.status !== "DELETED") {
       return NextResponse.json({
         duplicate: true,
         article: {
@@ -54,6 +54,9 @@ export async function POST(req: NextRequest) {
           tags: parseJsonArray(existing.tags),
         },
       });
+    }
+    if (existing && existing.status === "DELETED") {
+      await prisma.article.delete({ where: { id: existing.id } });
     }
 
     /* fetch metadata */

@@ -66,13 +66,16 @@ export async function POST(req: NextRequest) {
 
     const url = normalizeUrl(data.url);
 
-    /* duplicate check */
+    /* duplicate check — treat soft-deleted records as absent so the URL can be re-added */
     const existing = await prisma.article.findUnique({ where: { url } });
-    if (existing) {
+    if (existing && existing.status !== "DELETED") {
       return NextResponse.json(
         { error: "Article with this URL already exists", articleId: existing.id },
         { status: 409 }
       );
+    }
+    if (existing && existing.status === "DELETED") {
+      await prisma.article.delete({ where: { id: existing.id } });
     }
 
     /* fetch metadata from URL */
