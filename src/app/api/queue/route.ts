@@ -37,12 +37,18 @@ export async function GET(req: NextRequest) {
 /* ────────────────────────────── POST ───────────────────────────── */
 
 const queueSchema = z.object({
-  url:       z.string().url(),
-  title:     z.string().optional(),
-  outlet:    z.string().optional(),
-  section:   z.enum(["transmission", "energy", "labor", "local"]).nullable().optional(),
-  tags:      z.array(z.string()).optional(),
-  priority:  z.boolean().optional(),
+  url:           z.string().url(),
+  title:         z.string().optional(),
+  outlet:        z.string().optional(),
+  outletDomain:  z.string().optional(),
+  section:       z.enum(["transmission", "energy", "labor", "local"]).nullable().optional(),
+  tags:          z.array(z.string()).optional(),
+  priority:      z.boolean().optional(),
+  publishedAt:   z.string().optional(),
+  imageUrl:      z.string().url().or(z.literal("")).optional(),
+  snippet:       z.string().optional(),
+  manualSummary: z.string().optional(),
+  status:        z.enum(["QUEUED", "APPROVED", "NEEDS_MANUAL"]).optional(),
 });
 
 function normalizeUrl(raw: string): string {
@@ -78,12 +84,23 @@ export async function POST(req: NextRequest) {
       await prisma.article.delete({ where: { id: existing.id } });
     }
 
-    /* fetch metadata from URL */
-    const meta = await fetchUrlMetadata(url);
+    /* fetch metadata from URL only if caller didn't supply key fields */
+    const needsMetadata = !data.title || !data.outlet || !data.snippet || !data.imageUrl;
+    const meta = needsMetadata ? await fetchUrlMetadata(url) : { title: "", source: "", description: "", image: "", author: "" };
 
     const title = sanitizeText(data.title || meta.title || url);
     const outlet = sanitizeText(data.outlet || meta.source || new URL(url).hostname.replace(/^www\./, ""));
-    const outletDomain = new URL(url).hostname.replace(/^www\./, "");
+    const outletDomain = data.outletDomain || new URL(url).hostname.replace(/^www\./, "");
+    const snippetText = data.snippet ?? meta.description ?? null;
+    const imageUrl = data.imageUrl || meta.image || null;
+
+    let publishedAt: Date;
+    if (data.publishedAt) {
+      const parsed = new Date(data.publishedAt);
+      publishedAt = isNaN(parsed.getTime()) ? new Date() : parsed;
+    } else {
+      publishedAt = new Date();
+    }
 
     const article = await prisma.article.create({
       data: {
@@ -91,15 +108,16 @@ export async function POST(req: NextRequest) {
         title,
         outlet,
         outletDomain,
-        snippet: meta.description ? sanitizeText(meta.description) : null,
-        imageUrl: meta.image || null,
+        snippet: snippetText ? sanitizeText(snippetText) : null,
+        manualSummary: data.manualSummary || null,
+        imageUrl,
         author: meta.author ? sanitizeText(meta.author) : null,
         section: data.section ?? null,
         tags: JSON.stringify(data.tags ?? []),
         priority: data.priority ?? false,
-        status: "QUEUED",
+        status: data.status ?? "QUEUED",
         ingestSource: "MANUAL",
-        publishedAt: new Date(),
+        publishedAt,
         keywordsMatched: "[]",
       },
     });
