@@ -7,14 +7,10 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
-  Plus,
-  Trash2,
   GripVertical,
   Search,
   X,
   Calendar,
-  CheckSquare,
-  Square,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -23,21 +19,23 @@ import {
   formatSubjectDate,
   buildPlainTextClipsEmail,
   buildRichTextClipsHtml,
-  buildMailtoLink,
 } from "@/lib/clips";
 import type { ClipArticle, ClipSection } from "@/lib/clips";
 import type { Article } from "@/types";
 
-// ─── Preset section headings ─────────────────────────────────────────────────
+// ─── Section definitions (match the four public-facing categories) ───────────
 
-const SECTION_PRESETS = [
-  "California Transmission",
-  "California Energy",
-  "California Labor",
-  "Local Coverage",
-  "California Infrastructure",
-  "California Politics",
-];
+const SECTIONS = [
+  { key: "transmission", heading: "California Transmission" },
+  { key: "energy", heading: "California Energy" },
+  { key: "labor", heading: "California Labor" },
+  { key: "local", heading: "Local Coverage" },
+] as const;
+
+/** Map a DB section value to its display heading */
+function sectionHeading(key: string | null | undefined): string {
+  return SECTIONS.find((s) => s.key === key)?.heading ?? "Uncategorized";
+}
 
 // ─── Date range options ─────────────────────────────────────────────────────
 
@@ -59,10 +57,14 @@ export default function ClipsPage() {
   const [search, setSearch] = useState("");
   const [dateRange, setDateRange] = useState<DateRange>(14);
 
-  // Clip composition state
-  const [sections, setSections] = useState<ComposerSection[]>([
-    { id: crypto.randomUUID(), heading: SECTION_PRESETS[0], articleIds: [] },
-  ]);
+  // Clip composition state – all four sections pre-populated
+  const [sections, setSections] = useState<ComposerSection[]>(
+    SECTIONS.map((s) => ({
+      id: crypto.randomUUID(),
+      heading: s.heading,
+      articleIds: [],
+    }))
+  );
   const [activeSection, setActiveSection] = useState(0);
 
   // Per-article snippet overrides (keyed by article id)
@@ -120,38 +122,28 @@ export default function ClipsPage() {
     );
   }, [dateFilteredArticles, search]);
 
-  // ── Select All / Deselect All logic ────────────────────────────────────────
-  const currentSectionIds = sections[activeSection]?.articleIds ?? [];
-  const allVisibleInCurrentSection = useMemo(() => {
-    if (filteredArticles.length === 0) return false;
-    return filteredArticles.every((a) => currentSectionIds.includes(a.id));
-  }, [filteredArticles, currentSectionIds]);
+  // ── Articles grouped by section for the left-side picker ──────────────────
+  const groupedArticles = useMemo(() => {
+    const groups: { key: string; heading: string; articles: Article[] }[] =
+      SECTIONS.map((s) => ({ key: s.key, heading: s.heading, articles: [] }));
+    const uncategorized: Article[] = [];
 
-  function handleSelectAllToggle() {
-    const visibleIds = filteredArticles.map((a) => a.id);
-    if (allVisibleInCurrentSection) {
-      // Deselect all visible from current section
-      setSections((prev) =>
-        prev.map((s, i) => {
-          if (i !== activeSection) return s;
-          return {
-            ...s,
-            articleIds: s.articleIds.filter((id) => !visibleIds.includes(id)),
-          };
-        })
-      );
-    } else {
-      // Select all visible into current section (add those not already present)
-      setSections((prev) =>
-        prev.map((s, i) => {
-          if (i !== activeSection) return s;
-          const existing = new Set(s.articleIds);
-          const toAdd = visibleIds.filter((id) => !existing.has(id));
-          return { ...s, articleIds: [...s.articleIds, ...toAdd] };
-        })
-      );
+    for (const a of filteredArticles) {
+      const group = groups.find((g) => g.key === a.section);
+      if (group) {
+        group.articles.push(a);
+      } else {
+        uncategorized.push(a);
+      }
     }
-  }
+
+    // Only include groups that have articles; append uncategorized at end
+    const result = groups.filter((g) => g.articles.length > 0);
+    if (uncategorized.length > 0) {
+      result.push({ key: "uncategorized", heading: "Uncategorized", articles: uncategorized });
+    }
+    return result;
+  }, [filteredArticles]);
 
   // ── Helpers: resolve snippet for an article ────────────────────────────────
   function getSnippet(article: Article): string {
@@ -165,40 +157,34 @@ export default function ClipsPage() {
   }
 
   // ── Section management ─────────────────────────────────────────────────────
-  function addSection() {
-    const used = new Set(sections.map((s) => s.heading));
-    const next = SECTION_PRESETS.find((p) => !used.has(p)) ?? "New Section";
-    setSections((prev) => [
-      ...prev,
-      { id: crypto.randomUUID(), heading: next, articleIds: [] },
-    ]);
-    setActiveSection(sections.length);
-  }
-
-  function removeSection(idx: number) {
-    setSections((prev) => prev.filter((_, i) => i !== idx));
-    setActiveSection((prev) => Math.min(prev, sections.length - 2));
-  }
-
-  function updateSectionHeading(idx: number, heading: string) {
-    setSections((prev) =>
-      prev.map((s, i) => (i === idx ? { ...s, heading } : s))
-    );
-  }
+  // Sections are fixed to the four main categories; no add/remove needed
 
   function toggleArticle(articleId: string) {
-    setSections((prev) =>
-      prev.map((s, i) => {
-        if (i !== activeSection) return s;
-        const has = s.articleIds.includes(articleId);
-        return {
-          ...s,
-          articleIds: has
-            ? s.articleIds.filter((id) => id !== articleId)
-            : [...s.articleIds, articleId],
-        };
-      })
-    );
+    // Find the article's section to auto-place it in the matching composer section
+    const article = articleMap.get(articleId);
+    const matchHeading = article ? sectionHeading(article.section) : null;
+
+    setSections((prev) => {
+      // If removing, remove from whichever section it's in
+      const existingIdx = prev.findIndex((s) => s.articleIds.includes(articleId));
+      if (existingIdx !== -1) {
+        return prev.map((s, i) =>
+          i === existingIdx
+            ? { ...s, articleIds: s.articleIds.filter((id) => id !== articleId) }
+            : s
+        );
+      }
+
+      // If adding, place in the matching section (or active section as fallback)
+      const targetIdx = matchHeading
+        ? prev.findIndex((s) => s.heading === matchHeading)
+        : -1;
+      const addTo = targetIdx !== -1 ? targetIdx : activeSection;
+
+      return prev.map((s, i) =>
+        i === addTo ? { ...s, articleIds: [...s.articleIds, articleId] } : s
+      );
+    });
   }
 
   function removeArticleFromSection(sectionIdx: number, articleId: string) {
@@ -392,81 +378,67 @@ export default function ClipsPage() {
             )}
           </div>
 
-          {/* Select All / Deselect All toggle */}
-          {!loading && filteredArticles.length > 0 && (
-            <button
-              onClick={handleSelectAllToggle}
-              className="flex items-center gap-1.5 text-xs font-medium text-[--text-muted] hover:text-[--text-secondary] transition-colors"
-            >
-              {allVisibleInCurrentSection ? (
-                <CheckSquare className="h-3.5 w-3.5 text-brand-400" />
-              ) : (
-                <Square className="h-3.5 w-3.5" />
-              )}
-              {allVisibleInCurrentSection ? "Deselect All" : "Select All"}
-              <span className="text-[--text-muted]">
-                ({filteredArticles.length})
-              </span>
-            </button>
-          )}
-
-          {/* Article list */}
-          <div className="space-y-1.5 max-h-[calc(100vh-340px)] overflow-y-auto pr-1">
+          {/* Article list grouped by section */}
+          <div className="space-y-4 max-h-[calc(100vh-340px)] overflow-y-auto pr-1">
             {loading ? (
               <p className="text-sm text-[--text-muted] py-8 text-center">
                 Loading articles...
               </p>
-            ) : filteredArticles.length === 0 ? (
+            ) : groupedArticles.length === 0 ? (
               <p className="text-sm text-[--text-muted] py-8 text-center">
                 No approved articles found.
               </p>
             ) : (
-              filteredArticles.map((article) => {
-                const selected = allSelectedIds.has(article.id);
-                const inCurrentSection =
-                  sections[activeSection]?.articleIds.includes(article.id);
-                return (
-                  <button
-                    key={article.id}
-                    onClick={() => toggleArticle(article.id)}
-                    className={cn(
-                      "w-full text-left px-3 py-2.5 rounded-lg border transition-all duration-100",
-                      inCurrentSection
-                        ? "bg-brand-500/10 border-brand-500/30"
-                        : selected
-                          ? "bg-surface-raised border-surface-border opacity-50"
-                          : "bg-surface border-surface-border hover:border-brand-600/40 hover:bg-surface-raised"
-                    )}
-                  >
-                    <div className="flex items-start gap-2.5">
-                      <div
+              groupedArticles.map((group) => (
+                <div key={group.key} className="space-y-1.5">
+                  <p className="text-xs font-semibold text-[--text-secondary] uppercase tracking-wider px-1 pt-1 border-b border-surface-border pb-1.5">
+                    {group.heading}
+                    <span className="text-[--text-muted] font-normal ml-1.5">
+                      ({group.articles.length})
+                    </span>
+                  </p>
+                  {group.articles.map((article) => {
+                    const selected = allSelectedIds.has(article.id);
+                    return (
+                      <button
+                        key={article.id}
+                        onClick={() => toggleArticle(article.id)}
                         className={cn(
-                          "mt-0.5 h-4 w-4 rounded border-2 shrink-0 flex items-center justify-center transition-colors",
-                          inCurrentSection
-                            ? "bg-brand-400 border-brand-400"
-                            : selected
-                              ? "bg-surface-overlay border-[--text-muted]"
-                              : "border-[--text-muted]"
+                          "w-full text-left px-3 py-2.5 rounded-lg border transition-all duration-100",
+                          selected
+                            ? "bg-brand-500/10 border-brand-500/30"
+                            : "bg-surface border-surface-border hover:border-brand-600/40 hover:bg-surface-raised"
                         )}
                       >
-                        {(inCurrentSection || selected) && (
-                          <Check className="h-2.5 w-2.5 text-white" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-[--text-primary] leading-snug line-clamp-2">
-                          {article.title}
-                        </p>
-                        <p className="text-xs text-[--text-muted] mt-0.5">
-                          {article.outlet}
-                          {article.author ? ` (${article.author})` : ""} &middot;{" "}
-                          {formatClipDate(article.publishedAt)}
-                        </p>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })
+                        <div className="flex items-start gap-2.5">
+                          <div
+                            className={cn(
+                              "mt-0.5 h-4 w-4 rounded border-2 shrink-0 flex items-center justify-center transition-colors",
+                              selected
+                                ? "bg-brand-400 border-brand-400"
+                                : "border-[--text-muted]"
+                            )}
+                          >
+                            {selected && (
+                              <Check className="h-2.5 w-2.5 text-white" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-[--text-primary] leading-snug line-clamp-2">
+                              {article.title}
+                            </p>
+                            <p className="text-xs text-[--text-muted] mt-0.5">
+                              {article.outlet}
+                              {article.author ? ` (${article.author})` : ""} &middot;{" "}
+                              {formatClipDate(article.publishedAt)}
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ))
             )}
           </div>
         </div>
@@ -492,47 +464,15 @@ export default function ClipsPage() {
                 </span>
               </button>
             ))}
-            <button
-              onClick={addSection}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-dashed border-surface-border text-[--text-muted] hover:text-[--text-secondary] hover:border-brand-600/40 transition-colors"
-            >
-              <Plus className="h-3 w-3" /> Section
-            </button>
           </div>
 
           {/* Active section editor */}
           {sections[activeSection] && (
             <div className="space-y-3">
-              {/* Section heading input */}
-              <div className="flex items-center gap-2">
-                <div className="flex-1 relative">
-                  <input
-                    type="text"
-                    value={sections[activeSection].heading}
-                    onChange={(e) =>
-                      updateSectionHeading(activeSection, e.target.value)
-                    }
-                    placeholder="Section heading..."
-                    className="w-full px-3 py-2 text-sm bg-surface border border-surface-border rounded-lg text-[--text-primary] placeholder:text-[--text-muted] focus:outline-none focus:ring-1 focus:ring-brand-400"
-                    list="section-presets"
-                  />
-                  <datalist id="section-presets">
-                    {SECTION_PRESETS.map((p) => (
-                      <option key={p} value={p} />
-                    ))}
-                  </datalist>
-                </div>
-                {sections.length > 1 && (
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => removeSection(activeSection)}
-                    title="Remove section"
-                  >
-                    <Trash2 className="h-3.5 w-3.5 text-red-400" />
-                  </Button>
-                )}
-              </div>
+              {/* Section heading (read-only label) */}
+              <p className="text-sm font-semibold text-[--text-primary]">
+                {sections[activeSection].heading}
+              </p>
 
               {/* Articles in this section with editable snippets */}
               {sections[activeSection].articleIds.length === 0 ? (
