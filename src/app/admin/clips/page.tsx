@@ -257,29 +257,15 @@ export default function ClipsPage() {
   }
 
   // ── Actions ────────────────────────────────────────────────────────────────
-  async function handleGenerateEmail() {
+  function handleGenerateEmail() {
     const data = buildSections();
     if (data.length === 0) return;
 
-    // Copy the rich-text HTML to clipboard so the user can paste it
-    const html = buildRichTextClipsHtml(data);
-    const plain = buildPlainTextClipsEmail(data);
-    try {
-      await navigator.clipboard.write([
-        new ClipboardItem({
-          "text/html": new Blob([html], { type: "text/html" }),
-          "text/plain": new Blob([plain], { type: "text/plain" }),
-        }),
-      ]);
-    } catch {
-      await navigator.clipboard.writeText(plain);
-    }
-
-    // Show "paste" feedback
+    // Show "paste" reminder
     setEmailReady(true);
     setTimeout(() => setEmailReady(false), 4000);
 
-    // Open mailto with just the subject (user pastes the formatted body)
+    // Open mailto with just the subject (user pastes the rich text from Step 1)
     const subject = `CalGrid Clips: ${formatSubjectDate()}`;
     window.open(`mailto:?subject=${encodeURIComponent(subject)}`, "_blank");
   }
@@ -336,20 +322,20 @@ export default function ClipsPage() {
             ) : (
               <ClipboardCopy className="h-3.5 w-3.5" />
             )}
-            {copied ? "Copied!" : "Copy Rich Text"}
+            {copied ? "Copied!" : "Step 1: Copy Rich Text"}
           </Button>
           <Button
             size="sm"
             className="gap-2"
             onClick={handleGenerateEmail}
-            disabled={totalSelected === 0}
+            disabled={totalSelected === 0 || !copied}
           >
             {emailReady ? (
               <Check className="h-3.5 w-3.5 text-green-300" />
             ) : (
               <Mail className="h-3.5 w-3.5" />
             )}
-            {emailReady ? "Paste into email body" : "Generate Email Draft"}
+            {emailReady ? "Now paste into email body" : "Step 2: Generate Email Draft"}
           </Button>
         </div>
       </div>
