@@ -72,6 +72,7 @@ export default function ClipsPage() {
 
   // Copy feedback
   const [copied, setCopied] = useState(false);
+  const [emailReady, setEmailReady] = useState(false);
 
   // ── Fetch approved articles ────────────────────────────────────────────────
   const fetchArticles = useCallback(async () => {
@@ -256,11 +257,31 @@ export default function ClipsPage() {
   }
 
   // ── Actions ────────────────────────────────────────────────────────────────
-  function handleGenerateEmail() {
+  async function handleGenerateEmail() {
     const data = buildSections();
     if (data.length === 0) return;
-    const link = buildMailtoLink(data);
-    window.open(link, "_blank");
+
+    // Copy the rich-text HTML to clipboard so the user can paste it
+    const html = buildRichTextClipsHtml(data);
+    const plain = buildPlainTextClipsEmail(data);
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "text/html": new Blob([html], { type: "text/html" }),
+          "text/plain": new Blob([plain], { type: "text/plain" }),
+        }),
+      ]);
+    } catch {
+      await navigator.clipboard.writeText(plain);
+    }
+
+    // Show "paste" feedback
+    setEmailReady(true);
+    setTimeout(() => setEmailReady(false), 4000);
+
+    // Open mailto with just the subject (user pastes the formatted body)
+    const subject = `CalGrid Clips: ${formatSubjectDate()}`;
+    window.open(`mailto:?subject=${encodeURIComponent(subject)}`, "_blank");
   }
 
   async function handleCopyRichText() {
@@ -323,8 +344,12 @@ export default function ClipsPage() {
             onClick={handleGenerateEmail}
             disabled={totalSelected === 0}
           >
-            <Mail className="h-3.5 w-3.5" />
-            Generate Email Draft
+            {emailReady ? (
+              <Check className="h-3.5 w-3.5 text-green-300" />
+            ) : (
+              <Mail className="h-3.5 w-3.5" />
+            )}
+            {emailReady ? "Paste into email body" : "Generate Email Draft"}
           </Button>
         </div>
       </div>
