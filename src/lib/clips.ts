@@ -74,7 +74,7 @@ export function buildRichTextClipsHtml(sections: ClipSection[]): string {
     for (let i = 0; i < section.articles.length; i++) {
       const a = section.articles[i];
       lines.push(
-        `<p style="margin:0;font-size:14px;"><a href="${esc(a.url)}" style="color:#6A5ACD;">${esc(a.title)}</a></p>`
+        `<p style="margin:0;font-size:14px;"><a href="${esc(a.url)}" style="color:#6A5ACD;font-weight:bold;"><strong>${esc(a.title)}</strong></a></p>`
       );
       lines.push(
         `<p style="margin:0 0 12px 0;font-size:14px;"><strong>${esc(a.outlet)}</strong> (${esc(a.author)}) ${formatClipDate(a.publishedAt)}: ${esc(a.snippet)}</p>`
